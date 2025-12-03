@@ -1,0 +1,97 @@
+services:
+
+  # 1. CELERY WORKER: Now builds custom image with Poppler/Tesseract
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    
+    working_dir: /app
+    
+    command: ["celery", "-A", "app.celery_app", "worker", "-l", "info", "--concurrency=4"]
+    
+    volumes:
+      - ./:/app
+      - ./uploads:/app/uploads 
+      
+    depends_on:
+      - redis
+      - postgres
+      - qdrant
+    environment:
+      # Database - use postgres service name
+      DATABASE_URL: postgresql+asyncpg://tony:mypassword@postgres:5432/my_saas1
+      
+      # Celery - use redis service name
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      
+      # ✅ Redis for progress tracking - use redis service name
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+  
+      USE_OLLAMA: "false"
+      OLLAMA_URL: "http://host.docker.internal:11434"
+      
+      # Qdrant - use qdrant service name
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      
+    restart: unless-stopped
+
+  # 2. CELERY BEAT: Still uses the custom build to maintain dependency consistency
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    working_dir: /app
+    
+    command: ["celery", "-A", "app.celery_app", "beat", "-l", "info"]
+    
+    volumes:
+      - ./:/app
+    depends_on:
+      - redis
+    environment:
+      # Celery - use redis service name
+      CELERY_BROKER_URL: redis://redis:6379/0 
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      
+      # ✅ Redis for progress tracking - use redis service name
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      
+    restart: unless-stopped
+
+  # 3. POSTGRES: Exposes 5433 for your local PostgreSQL Client/FastAPI (if using the container DB)
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: my_saas1
+      POSTGRES_USER: tony
+      POSTGRES_PASSWORD: mypassword
+    ports:
+      - "5433:5432" # Host port 5433 -> Container port 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # 4. REDIS: Broker for Celery
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # 5. QDRANT: Vector Store
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  qdrant_storage:

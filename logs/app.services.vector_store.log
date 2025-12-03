@@ -1,0 +1,4 @@
+2025-11-29 13:39:43,024 [INFO] app.services.vector_store: Upserting 1231 vectors to tenant_fbbfbb45-08e9-447e-9946-9fcc2c6cacc3
+2025-11-29 13:39:43,342 [INFO] app.services.vector_store: Creating collection: tenant_fbbfbb45-08e9-447e-9946-9fcc2c6cacc3
+2025-11-29 13:39:43,606 [INFO] app.services.vector_store: Collection tenant_fbbfbb45-08e9-447e-9946-9fcc2c6cacc3 created
+2025-11-29 13:39:44,798 [INFO] app.services.vector_store: Successfully upserted 1231 vectors

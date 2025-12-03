@@ -1,0 +1,30 @@
+# ============================================================================
+# CELERY REQUIREMENTS - BARE MINIMUM TO RUN
+# ============================================================================
+
+# Celery Core
+celery[redis]
+
+# Configuration (app/config.py imports)
+pydantic
+pydantic-settings
+
+# Database (app/database.py, app/models/models.py imports)
+sqlalchemy
+psycopg2-binary
+
+# Redis client (for progress tracking in tasks)
+redis
+asyncpg
+# PDF Processing (extract_pdf_text_task)
+PyPDF2
+requests
+httpx
+
+# OCR (extract_text_with_ocr_fallback)
+pytesseract
+pdf2image
+Pillow
+
+# Vector Store (upsert_vectors_task)
+qdrant-client

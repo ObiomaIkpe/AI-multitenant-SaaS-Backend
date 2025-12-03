@@ -1,0 +1,81 @@
+# ===============================
+# Python
+# ===============================
+*.pyc
+*.pyo
+__pycache__/
+*.pyd
+*.so
+
+# ===============================
+# Virtual Environment
+# ===============================
+venv/
+.env/
+.env.*
+.venv/
+
+# ===============================
+# FastAPI - Local Config & Secrets
+# ===============================
+.env
+.env.local
+.env.dev
+.env.prod
+*.pem
+
+
+
+# ===============================
+# Alembic / DB
+# ===============================
+alembic/versions/*.pyc
+*.db
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# ===============================
+# Models / Machine Learning
+# ===============================
+models/
+sentence-transformers/
+huggingface_cache/
+.cache/huggingface/
+
+# If models downloaded under app directory
+app/ml/models/
+
+# ===============================
+# Qdrant / Vector DB
+# ===============================
+.qdrant/
+
+# ===============================
+# Uploads / Static User Files
+# ===============================
+uploads/
+
+# ===============================
+# Docker
+# ===============================
+*.dockerignore
+docker-compose.override.yml
+docker-data/
+**/.dockerignore
+
+# ===============================
+# VSCode & Editor
+# ===============================
+.vscode/
+.idea/
+*.swp
+*~
+
+# ===============================
+# System files
+# ===============================
+.DS_Store
+Thumbs.db
+.env

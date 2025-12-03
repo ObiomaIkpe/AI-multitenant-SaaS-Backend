@@ -1,0 +1,5 @@
+2025-11-29 13:32:21,569 [INFO] app.api.embeddings_switch: [LocalService] Generating embeddings for 1231 texts
+2025-11-29 13:32:21,583 [ERROR] app.api.embeddings_switch: Local embedding service failed: Local embedding service error: 404 - {"detail":"Not Found"}
+2025-11-29 13:36:41,262 [INFO] app.api.embeddings_switch: [LocalService] Generating embeddings for 1231 texts
+2025-11-29 13:36:41,279 [ERROR] app.api.embeddings_switch: Local embedding service failed: Local embedding service error: 404 - {"detail":"Not Found"}
+2025-11-29 13:38:53,756 [INFO] app.api.embeddings_switch: [LocalService] Generating embeddings for 1231 texts

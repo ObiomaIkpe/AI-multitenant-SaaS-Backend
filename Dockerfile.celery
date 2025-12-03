@@ -1,0 +1,22 @@
+# Dockerfile.celery
+
+# 1. Base Image
+FROM python:3.11-slim
+
+# 2. Install System Dependencies (Poppler for pdf2image, Tesseract for pytesseract)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        poppler-utils \
+        tesseract-ocr \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 3. Setup Environment
+WORKDIR /app
+
+# 4. Install ONLY lightweight Celery dependencies
+COPY requirements.celery.txt . 
+RUN pip install --no-cache-dir -r requirements.celery.txt
+
+# 5. Copy Application Code
+COPY . .

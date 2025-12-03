@@ -1,0 +1,11 @@
+2025-11-29 07:31:04,965 [INFO] app.services.embeddings_switch: Using Sentence Transformers for embeddings (local/dev)
+2025-11-29 07:31:28,305 [INFO] app.services.embeddings_switch: Using Sentence Transformers for embeddings (local/dev)
+2025-11-29 07:31:42,122 [INFO] app.services.embeddings_switch: Using Sentence Transformers for embeddings (local/dev)
+2025-11-29 07:38:08,113 [INFO] app.services.embeddings_switch: Using Sentence Transformers for embeddings (local/dev)
+2025-11-29 08:11:24,361 [INFO] app.services.embeddings_switch: Using Sentence Transformers for embeddings (local/dev)
+2025-11-29 08:35:14,710 [INFO] app.services.embeddings_switch: Using Sentence Transformers for embeddings (local/dev)
+2025-11-29 08:39:36,263 [INFO] app.services.embeddings_switch: Using Sentence Transformers for embeddings (local/dev)
+2025-11-29 08:39:52,254 [INFO] app.services.embeddings_switch: Using Sentence Transformers for embeddings (local/dev)
+2025-11-29 08:41:07,852 [INFO] app.services.embeddings_switch: Using Sentence Transformers for embeddings (local/dev)
+2025-11-29 08:41:29,352 [INFO] app.services.embeddings_switch: Using Sentence Transformers for embeddings (local/dev)
+2025-11-29 12:51:02,504 [INFO] app.services.embeddings_switch: Using Ollama embeddings (production) at http://host.docker.internal:11434
