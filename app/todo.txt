@@ -1,2 +1,8 @@
-TODO: Verify non-admins can't access admin endpoints
-TODO: Verify suspended org blocks all users
+TODO: Verify non-admins can't access admin endpoints.
+TODO: Verify suspended org blocks all users.
+
+
+3rd December 2025
+TODO: test the new role routes, study how it fits with the database schema,
+      and what can be improved.
+

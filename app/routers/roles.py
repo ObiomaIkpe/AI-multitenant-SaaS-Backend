@@ -176,3 +176,158 @@ async def update_role(
     await db.refresh(role)
     
     return role
+
+
+# ============================================================
+# ASSIGN ROLE TO USER
+# ============================================================
+@router.post("/{role_id}/assign/{user_id}")
+async def assign_role_to_user(
+    role_id: str,
+    user_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.models.models import UserRole
+    
+    # Verify role exists in org
+    role_result = await db.execute(
+        select(Role).where(Role.role_id == role_id, Role.org_id == admin.org_id)
+    )
+    role = role_result.scalar_one_or_none()
+    
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    
+    # Verify user exists in org
+    user_result = await db.execute(
+        select(User).where(User.user_id == user_id, User.org_id == admin.org_id)
+    )
+    user = user_result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found in organization")
+    
+    # Check if already assigned
+    existing = await db.execute(
+        select(UserRole).where(
+            UserRole.user_id == user_id,
+            UserRole.role_id == role_id
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Role already assigned")
+    
+    user_role = UserRole(
+        user_id=user_id,
+        role_id=role_id,
+        assigned_by=admin.user_id
+    )
+    db.add(user_role)
+    await db.commit()
+    
+    return {"message": "Role assigned successfully"}
+
+
+# ============================================================
+# REMOVE ROLE FROM USER
+# ============================================================
+@router.delete("/{role_id}/remove/{user_id}")
+async def remove_role_from_user(
+    role_id: str,
+    user_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.models.models import UserRole
+    
+    # Verify role and user in same org
+    role_result = await db.execute(
+        select(Role).where(Role.role_id == role_id, Role.org_id == admin.org_id)
+    )
+    if not role_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Role not found")
+    
+    user_result = await db.execute(
+        select(User).where(User.user_id == user_id, User.org_id == admin.org_id)
+    )
+    if not user_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Delete assignment
+    result = await db.execute(
+        delete(UserRole).where(
+            UserRole.user_id == user_id,
+            UserRole.role_id == role_id
+        )
+    )
+    
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Role assignment not found")
+    
+    await db.commit()
+    return {"message": "Role removed successfully"}
+
+
+# ============================================================
+# GET USERS WITH SPECIFIC ROLE
+# ============================================================
+@router.get("/{role_id}/users")
+async def get_role_users(
+    role_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.models.models import UserRole
+    
+    # Verify role exists
+    role_result = await db.execute(
+        select(Role).where(Role.role_id == role_id, Role.org_id == admin.org_id)
+    )
+    role = role_result.scalar_one_or_none()
+    
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    
+    # Get users with this role
+    result = await db.execute(
+        select(User).join(UserRole).where(UserRole.role_id == role_id)
+    )
+    users = result.scalars().all()
+    
+    return {
+        "role": role,
+        "users": users
+    }
+
+
+# ============================================================
+# GET USER'S ROLES
+# ============================================================
+@router.get("/user/{user_id}/roles")
+async def get_user_roles(
+    user_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.models.models import UserRole
+    
+    # Verify user in same org
+    user_result = await db.execute(
+        select(User).where(User.user_id == user_id, User.org_id == admin.org_id)
+    )
+    user = user_result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get user's roles
+    result = await db.execute(
+        select(Role).join(UserRole).where(UserRole.user_id == user_id)
+    )
+    roles = result.scalars().all()
+    
+    return {
+        "user": user,
+        "roles": roles
+    }

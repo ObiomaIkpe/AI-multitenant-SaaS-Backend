@@ -40,6 +40,15 @@ class OrganizationBrandingUpdate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class OrganizationUpdate(BaseModel):
+    org_name: Optional[str] = None
+    billing_email: Optional[EmailStr] = None
+    max_users: Optional[int] = None
+    logo_url: Optional[str] = None
+    favicon_url: Optional[str] = None
+    theme_color: Optional[str] = None
+    domain: Optional[str] = None
+
 
 class OrganizationResponseTesting(BaseModel):
     org_id: UUID
@@ -60,4 +69,10 @@ class OrganizationResponseTesting(BaseModel):
 
     class Config:
         orm_mode = True  
+
+class SubscriptionUpgrade(BaseModel):
+    new_tier: SubscriptionTier
+
+class TransferOwnership(BaseModel):
+    new_owner_id: UUID
         

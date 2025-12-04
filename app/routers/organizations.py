@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.models.models import User, UserRole, Organization, Role
-from app.schemas.orginization_schema import OrganizationCreate, OrganizationResponse, OrganizationResponseTesting
+from app.schemas.orginization_schema import OrganizationCreate, OrganizationResponse, OrganizationResponseTesting, SubscriptionUpgrade, TransferOwnership
 from app.dependencies.dependencies_main import get_current_user
 from app.utils.enums import SubscriptionStatus, SubscriptionTier
 from app.config import settings
@@ -134,3 +134,270 @@ async def get_my_organization(
         )
 
     return org
+
+
+from app.schemas.orginization_schema import OrganizationUpdate  # Add to imports
+
+@router.patch("/update", response_model=OrganizationResponse)
+async def update_organization(
+    org_update: OrganizationUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user.org_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="You don't belong to an organization"
+        )
+    
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    result = await db.execute(
+        select(Organization).where(Organization.org_id == current_user.org_id)
+    )
+    org = result.scalar_one_or_none()
+    
+    if not org:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found"
+        )
+    
+    # Update only provided fields
+    for field, value in org_update.model_dump(exclude_unset=True).items():
+        setattr(org, field, value)
+    
+    await db.commit()
+    await db.refresh(org)
+    return org
+
+
+from app.schemas.orginization_schema import (
+    SubscriptionUpgrade, 
+    TransferOwnership
+)
+
+# ============================================================
+# UPGRADE SUBSCRIPTION
+# ============================================================
+@router.post("/upgrade")
+async def upgrade_subscription(
+    upgrade_data: SubscriptionUpgrade,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user.org_id:
+        raise HTTPException(status_code=404, detail="No organization found")
+    
+    result = await db.execute(
+        select(Organization).where(Organization.org_id == current_user.org_id)
+    )
+    org = result.scalar_one_or_none()
+    
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Require owner or admin
+    if org.owner_user_id != current_user.user_id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Owner/admin access required")
+    
+    # Validate tier transition
+    if upgrade_data.new_tier == org.subscription_tier:
+        raise HTTPException(status_code=400, detail="Already on this tier")
+    
+    try:
+        # Cancel existing subscription if exists
+        if org.stripe_subscription_id:
+            await anyio.to_thread.run_sync(
+                stripe_utils.cancel_subscription,
+                org.stripe_subscription_id
+            )
+        
+        # Create new subscription
+        if upgrade_data.new_tier != SubscriptionTier.free:
+            subscription = await anyio.to_thread.run_sync(
+                stripe_utils.create_subscription,
+                org,
+                upgrade_data.new_tier,
+            )
+            org.stripe_subscription_id = subscription.get("id")
+            org.subscription_status = SubscriptionStatus.active
+        else:
+            org.stripe_subscription_id = None
+            org.subscription_status = SubscriptionStatus.trial
+        
+        org.subscription_tier = upgrade_data.new_tier
+        
+        await db.commit()
+        await db.refresh(org)
+        
+        return {
+            "message": f"Upgraded to {upgrade_data.new_tier.value}",
+            "organization": org
+        }
+    
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Upgrade failed: {str(e)}"
+        )
+
+
+# ============================================================
+# GET BILLING PORTAL
+# ============================================================
+@router.get("/billing-portal")
+async def get_billing_portal(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user.org_id:
+        raise HTTPException(status_code=404, detail="No organization found")
+    
+    result = await db.execute(
+        select(Organization).where(Organization.org_id == current_user.org_id)
+    )
+    org = result.scalar_one_or_none()
+    
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Require owner or admin
+    if org.owner_user_id != current_user.user_id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Owner/admin access required")
+    
+    if not org.stripe_customer_id:
+        raise HTTPException(status_code=400, detail="No Stripe customer found")
+    
+    try:
+        portal_url = await anyio.to_thread.run_sync(
+            stripe_utils.create_billing_portal_session,
+            org.stripe_customer_id
+        )
+        return {"url": portal_url}
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create portal session: {str(e)}"
+        )
+
+
+# ============================================================
+# CANCEL SUBSCRIPTION
+# ============================================================
+@router.post("/cancel-subscription")
+async def cancel_subscription(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user.org_id:
+        raise HTTPException(status_code=404, detail="No organization found")
+    
+    result = await db.execute(
+        select(Organization).where(Organization.org_id == current_user.org_id)
+    )
+    org = result.scalar_one_or_none()
+    
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Require owner or admin
+    if org.owner_user_id != current_user.user_id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Owner/admin access required")
+    
+    if not org.stripe_subscription_id:
+        raise HTTPException(status_code=400, detail="No active subscription")
+    
+    try:
+        await anyio.to_thread.run_sync(
+            stripe_utils.cancel_subscription,
+            org.stripe_subscription_id
+        )
+        
+        org.stripe_subscription_id = None
+        org.subscription_tier = SubscriptionTier.free
+        org.subscription_status = SubscriptionStatus.cancelled
+        
+        await db.commit()
+        await db.refresh(org)
+        
+        return {
+            "message": "Subscription cancelled",
+            "organization": org
+        }
+    
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Cancellation failed: {str(e)}"
+        )
+
+
+# ============================================================
+# TRANSFER OWNERSHIP
+# ============================================================
+@router.post("/transfer-ownership")
+async def transfer_ownership(
+    transfer_data: TransferOwnership,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user.org_id:
+        raise HTTPException(status_code=404, detail="No organization found")
+    
+    result = await db.execute(
+        select(Organization).where(Organization.org_id == current_user.org_id)
+    )
+    org = result.scalar_one_or_none()
+    
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Only current owner can transfer
+    if org.owner_user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Only owner can transfer ownership")
+    
+    # Verify target user exists and is admin in same org
+    target_result = await db.execute(
+        select(User).where(
+            User.user_id == transfer_data.new_owner_id,
+            User.org_id == org.org_id
+        )
+    )
+    target_user = target_result.scalar_one_or_none()
+    
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found in organization")
+    
+    if not target_user.is_admin:
+        raise HTTPException(status_code=400, detail="Target user must be an admin")
+    
+    if target_user.user_id == current_user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot transfer to yourself")
+    
+    try:
+        org.owner_user_id = target_user.user_id
+        
+        await db.commit()
+        await db.refresh(org)
+        
+        # TODO: Send email notifications to both users
+        
+        return {
+            "message": f"Ownership transferred to {target_user.email}",
+            "organization": org
+        }
+    
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Transfer failed: {str(e)}"
+        )

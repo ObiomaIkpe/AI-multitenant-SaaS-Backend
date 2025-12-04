@@ -23,3 +23,14 @@ def create_subscription(org, tier: str):
     org.stripe_subscription_id = subscription['id']
     org.subscription_tier = tier
     org.subscription_status = subscription['status']
+
+
+def cancel_subscription(subscription_id: str):
+    return stripe.Subscription.delete(subscription_id)
+
+def create_billing_portal_session(customer_id: str):
+    session = stripe.billing_portal.Session.create(
+        customer=customer_id,
+        return_url="https://yourdomain.com/settings"  # Configure this
+    )
+    return session.url
